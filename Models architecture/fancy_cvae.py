@@ -113,16 +113,31 @@ class Decoder(nn.Module):
             nn.ReLU(True),
 
             # 79*79 64 channels to 158*158 2 channels
-            nn.ConvTranspose2d(nf, 1, 4, 2, 1, bias = False),
-            nn.Sigmoid()
+            nn.ConvTranspose2d(nf, nc, 4, 2, 1, bias = False),
         )
+        self.sigmoid = nn.Sigmoid()
         self.linear1 = nn.Linear(z_dim, 25)
+
+    def concatenate(self, x, condition):
+        x = x.unsqueeze(1)
+        condition_img = condition[:, None, None, None]*torch.ones_like(x)
+        x_cond = torch.cat((x, condition_img), dim = 1)
+        return x_cond
+    
+    def split(self, x_cond):
+        x = x_cond[:,0,:,:]
+        condition = x_cond[:,1,0,0]
+        return x, condition
 
     def forward(self, z_cond):
 
         z_cond = self.linear1(z_cond).reshape((-1, self.nc, 5, 5))
-        x_pred = self.layers(z_cond)
-        return x_pred.squeeze()
+        z_cond = self.layers(z_cond)
+        x_pred, cond_pred = self.split(z_cond)
+        x_pred = self.sigmoid(x_pred)
+        x_cond_pred = self.concatenate(x_pred, cond_pred)
+
+        return x_cond_pred
 
 
 class VariationalAutoencoder(nn.Module):
@@ -151,8 +166,12 @@ class VariationalAutoencoder(nn.Module):
         x_cond = torch.cat((x, condition_img), dim = 1)
         return x_cond
     
+    def split(self, x_cond):
+        x = x_cond[:,0,:,:]
+        condition = x_cond[:,1,0,0]
+        return x, condition
 
-    def train_time(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
+    def train_time(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1, k = 1000):
         device = 'cuda' 
         
         # No tracking of the iotimizer during training maybe ? 
@@ -169,23 +188,26 @@ class VariationalAutoencoder(nn.Module):
                     x = x.to(device) # (N, 158, 158) on gpu
                     condition = condition.to(device)
                     x_cond = self.concatenate(x, condition)
-                    x_pred = self.forward(x_cond)
-                    loss = loss_fn(x_pred, x) + beta*self.encoder.kl
+                    x_cond_pred= self.forward(x_cond)
+                    x_pred, condition_pred = self.split(x_cond_pred)
+                    loss = loss_fn(x_pred, x) + 1000*loss_fn(condition_pred, condition) + beta*self.encoder.kl
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
                     train_loss.append(loss.item())
-                    mse.append(loss_fn(x_pred, x).item())
+                    mse.append((loss_fn(x_pred, x) + 1000*loss_fn(condition_pred, condition)).item())
                     kl.append(self.encoder.kl.item())
                     pbar.set_description(f"Train loss: {loss.item():.2g}")
 
 
                 with torch.no_grad():
-                    for x, condition in val_loader:
-                        x = x.to(device)
-                        condition = condition.to(device)
+                    for x , condition in val_loader:
+                        x, condition = x.to(device), condition.to(device)
                         x_cond = self.concatenate(x, condition)
-                        loss = loss_fn(x_pred, x) + beta*self.encoder.kl
+                        x_cond_pred = self.forward(x_cond)
+                        x_pred, condition_pred = self.split(x_cond_pred)
+                        loss = loss_fn(x_pred, x) + k*loss_fn(condition_pred, condition) + beta*self.encoder.kl # maybe choose a tensor k so that k*rs = one number for every rs would improve the results for low rs 
                         val_loss.append(loss.item())
+
 
         return np.array(train_loss), np.array(val_loss), np.array(mse), np.array(kl)
