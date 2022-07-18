@@ -185,6 +185,7 @@ class VariationalAutoencoder(nn.Module):
                         x = x.to(device)
                         condition = condition.to(device)
                         x_cond = self.concatenate(x, condition)
+                        x_pred = self.forward(x_cond)
                         loss = loss_fn(x_pred, x) + beta*self.encoder.kl
                         val_loss.append(loss.item())
 
