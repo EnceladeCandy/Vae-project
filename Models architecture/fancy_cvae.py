@@ -206,7 +206,7 @@ class VariationalAutoencoder(nn.Module):
                         x_cond = self.concatenate(x, condition)
                         x_cond_pred = self.forward(x_cond)
                         x_pred, condition_pred = self.split(x_cond_pred)
-                        loss = loss_fn(x_pred, x) + k*loss_fn(condition_pred, condition) + beta*self.encoder.kl # maybe choose a tensor k so that k*rs = one number for every rs would improve the results for low rs 
+                        loss = loss_fn(x_pred, x) + k*loss_fn(condition_pred, condition) + beta*self.encoder.kl
                         val_loss.append(loss.item())
 
 
