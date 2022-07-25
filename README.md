@@ -1,6 +1,6 @@
 
 # Topic
-This project aims to generate galaxy images based on data provided by the Hubble Space Telescope (HST). To do so, we are implementing an unsupervised machine learning technique called a Variational Autoencoder (Vae) based on statistical Bayesian inference. The trained Vae model allows us to decode a random latent variable $z$ sampled from a normal distribution $\mathcal{N}(0;1) $ into a realistic galaxy image. For further information on the general Vae model, please read : [Auto-encoding Variational Bayes, _Kingma and Welling_, 2014](https://arxiv.org/abs/1312.6114?context=cs.LG).  
+This project aims to generate galaxy images based on data provided by the Hubble Space Telescope (HST). To do so, we are implementing an unsupervised machine learning technique called a Variational Autoencoder (Vae) based on statistical Bayesian inference. The trained Vae model allows us to decode a random latent variable $z$ sampled from a normal distribution $\mathcal{N}(0;1)$ into a realistic galaxy image. For further information on the general Vae model, please read : [Auto-encoding Variational Bayes, _Kingma and Welling_, 2014](https://arxiv.org/abs/1312.6114?context=cs.LG).  
 
 We used two datasets for which we developped different Vae architectures, and even implemented a Conditional Vae for the second one : 
 - 47 955 galaxies from Hubble's famous Deep Field image (the images have 128*128 pixels)
