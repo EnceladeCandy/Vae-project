@@ -201,7 +201,7 @@ class VariationalAutoencoder(nn.Module):
 
 
                 with torch.no_grad():
-                    for x , condition in val_loader:
+                    for x, condition in val_loader:
                         x, condition = x.to(device), condition.to(device)
                         x_cond = self.concatenate(x, condition)
                         x_cond_pred = self.forward(x_cond)
