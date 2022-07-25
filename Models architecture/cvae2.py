@@ -149,6 +149,8 @@ class VariationalAutoencoder(nn.Module):
         
         with trange(epochs) as pbar:
             for epoch in pbar:
+                if epoch == 40:
+                    optimizer = optim.Adam(self.parameters(), lr = 1e-3*learning_rate)
                 for x, condition in train_loader:
                     x, condition = x.to(device), condition.to(device)
                     x_pred = self.forward(x, condition)

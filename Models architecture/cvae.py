@@ -52,7 +52,14 @@ class VariationalEncoder(nn.Module):
         z = mu + std*epsilon
         return z
 
-    def concatenate(self, x, condition):
+
+    def concatenate1(self, x, condition):
+        x = x.unsqueeze(1)
+        condition_img = condition[:, None, None, None] * torch.ones_like(x)
+        x_cond = torch.cat((x, condition_img), dim = 1)
+        return x_cond
+
+    def concatenate2(self, x, condition):
         """
         Concatenate a tensor x of shape (N, k) and a condition tensor (N,) along the channel dimension
         Returns the concatenated tensor x_cond = (N, 2, k)  
@@ -61,10 +68,11 @@ class VariationalEncoder(nn.Module):
         x_cond = torch.cat((x, condition_img), dim = 1)
         return x_cond
 
+    
 
-    def forward(self, x_cond):
-        # x_cond = (N, 2, 158, 158) created during the training loop 
-        condition = x_cond[:,1,0,0]
+    def forward(self, x, condition):
+        # x_cond = (N, 2, 158, 158)  
+        x_cond = self.concatenate1(x, condition)
         x_cond = self.layers(x_cond) # (N, 1, 5, 5)
         x_cond = torch.flatten(x_cond, start_dim = 2)
         
@@ -74,7 +82,7 @@ class VariationalEncoder(nn.Module):
         self.std = torch.exp(logVar/2)
         
         z = self.reparameterize(self.mu, self.std) # (N, 1, z_dim)
-        z_cond = self.concatenate(z, condition)
+        z_cond = self.concatenate2(z, condition)
 
         # Updating the kl term value
         self.kl = 1/2*(self.mu**2 + torch.exp(logVar) -logVar -1).sum()
@@ -141,8 +149,8 @@ class VariationalAutoencoder(nn.Module):
         self.encoder = VariationalEncoder(nc, nf, z_dim)
         self.decoder = Decoder(nc, nf, z_dim)
 
-    def forward(self, x_cond):
-        z_cond = self.encoder(x_cond)
+    def forward(self, x, condition):
+        z_cond = self.encoder(x, condition)
         return self.decoder(z_cond)
     
     def concatenate(self, x, condition):
@@ -168,8 +176,7 @@ class VariationalAutoencoder(nn.Module):
                 for x, condition in train_loader:
                     x = x.to(device) # (N, 158, 158) on gpu
                     condition = condition.to(device)
-                    x_cond = self.concatenate(x, condition)
-                    x_pred = self.forward(x_cond)
+                    x_pred = self.forward(x, condition)
                     loss = loss_fn(x_pred, x) + beta*self.encoder.kl
                     optimizer.zero_grad()
                     loss.backward()
