@@ -133,7 +133,7 @@ class generate():
         for i in range(rows):
             for j in range(cols):
                 z_generated = torch.normal(0, 1, size = (1, self.z_dim)).to(self.device)
-                z_cond = torch.cat((z_generated, redshift.unsqueeze(0)), dim = 1)
+                z_cond = torch.cat((z_generated, redshift.unsqueeze(1)), dim = 1)
                 pred_galaxies = self.Vae.decoder(z_cond)
                 
                 axs[i,j].imshow(pred_galaxies.detach().to('cpu').squeeze().numpy(), cmap = colour)
