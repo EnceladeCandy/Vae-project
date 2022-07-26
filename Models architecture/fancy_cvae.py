@@ -60,7 +60,7 @@ class VariationalEncoder(nn.Module):
 
     def concatenate2(self, x, condition):
         """
-        Concatenate a tensor x of shape (N, k) and a condition tensor (N,) along the channel dimension
+        Concatenate a tensor x of shape (N, 1, k) and a condition tensor (N,) along the channel dimension
         Returns the concatenated tensor x_cond = (N, 2, k)  
         """
         condition_img = condition[:, None, None]*torch.ones_like(x)
@@ -125,12 +125,6 @@ class Decoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.linear1 = nn.Linear(z_dim, 25)
 
-    def concatenate(self, x, condition):
-        x = x.unsqueeze(1)
-        condition_img = condition[:, None, None, None]*torch.ones_like(x)
-        x_cond = torch.cat((x, condition_img), dim = 1)
-        return x_cond
-    
     def split(self, x_cond):
         x = x_cond[:,0,:,:]
         condition = x_cond[:,1,0,0]
@@ -166,17 +160,7 @@ class VariationalAutoencoder(nn.Module):
         z_cond = self.encoder(x, condition)
         return self.decoder(z_cond)
     
-    def concatenate(self, x, condition):
-        x = x.unsqueeze(1)
-        condition_img = condition[:, None, None, None]*torch.ones_like(x)
-        x_cond = torch.cat((x, condition_img), dim = 1)
-        return x_cond
     
-    def split(self, x_cond):
-        x = x_cond[:,0,:,:]
-        condition = x_cond[:,1,0,0]
-        return x, condition
-
     def train_time(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1, k = 1000):
         device = 'cuda' 
         
@@ -207,9 +191,7 @@ class VariationalAutoencoder(nn.Module):
                 with torch.no_grad():
                     for x, condition in val_loader:
                         x, condition = x.to(device), condition.to(device)
-                        x_cond = self.concatenate(x, condition)
-                        x_cond_pred = self.forward(x_cond)
-                        x_pred, condition_pred = self.split(x_cond_pred)
+                        x_pred, condition_pred = self.forward(x, condition)
                         loss = loss_fn(x_pred, x) + k*loss_fn(condition_pred, condition) + beta*self.encoder.kl
                         val_loss.append(loss.item())
 
@@ -249,9 +231,7 @@ class VariationalAutoencoder(nn.Module):
                 with torch.no_grad():
                     for x, condition in val_loader:
                         x, condition = x.to(device), condition.to(device)
-                        x_cond = self.concatenate(x, condition)
-                        x_cond_pred = self.forward(x_cond)
-                        x_pred, condition_pred = self.split(x_cond_pred)
+                        x_pred, condition_pred = self.forward(x, condition)
                         loss = loss_fn(x_pred, x) + k*loss_fn(condition_pred, condition) + beta[epoch]*self.encoder.kl
                         val_loss.append(loss.item())
 

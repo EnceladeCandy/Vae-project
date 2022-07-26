@@ -21,7 +21,7 @@ class reconstruct():
             rdm_label = torch.randint(self.batchsize, size =(1,))
             axs[0,j].imshow(galaxies[rdm_label].squeeze(), cmap = colour)
             axs[0,j].axis("off")
-            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.6, 0.85), color = 'white', fontsize = 7)
+            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 7)
             axs[1,j].imshow(galaxies_pred[rdm_label].detach().to('cpu').numpy().squeeze(), cmap = colour)
             axs[1,j].axis("off")
         
@@ -32,17 +32,19 @@ class reconstruct():
 
 
     def fancy_cvae(self, galaxies, zphot, colour = 'hot', num_images = 10, title = False, img_title = 'Reconstruction fancy cvae'):
-        galaxies_pred = self.Vae(galaxies.to(self.device), zphot.to(self.device))
+        galaxies_pred, zphot_pred = self.Vae(galaxies.to(self.device), zphot.to(self.device))
         
         figure, axs = plt.subplots(2, num_images, figsize = (num_images, 2))
+        
         for j in range(num_images): 
             rdm_label = torch.randint(self.batchsize, size =(1,))
             axs[0,j].imshow(galaxies[rdm_label].squeeze(), cmap = colour)
             axs[0,j].axis("off")
-            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.6, 0.85), color = 'white', fontsize = 7)
+            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 6)
+            
             axs[1,j].imshow(galaxies_pred[rdm_label].detach().to('cpu').numpy().squeeze(), cmap = colour)
             axs[1,j].axis("off")
-            axs[1,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.6, 0.85), color = 'white', fontsize = 7)
+            axs[1,j].annotate(f"{zphot_pred[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 6)
         
         if title:
             figure.suptitle(title, y = 0.22)
@@ -51,7 +53,7 @@ class reconstruct():
     
     def vae158(self, galaxies, redshift, colour = 'hot', num_images = 10, title = False, img_title = 'Reconstruction Vae'):
         # Input of cvae and cvae 2 is galaxies + redshifts
-        galaxies_pred = self.Vae(galaxies.to(self.device), redshift.to(self.device))
+        galaxies_pred = self.Vae(galaxies.unsqueeze(1).to(self.device))
 
         figure, axs = plt.subplots(2, num_images, figsize = (num_images, 2))
         
@@ -59,7 +61,7 @@ class reconstruct():
             rdm_label = torch.randint(self.batchsize, size =(1,))
             axs[0,j].imshow(galaxies[rdm_label].squeeze(), cmap = colour)
             axs[0,j].axis("off")
-            axs[0,j].annotate(f"{redshift[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.6, 0.85), color = 'white', fontsize = 7)
+            axs[0,j].annotate(f"{redshift[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 6)
             
             axs[1,j].imshow(galaxies_pred[rdm_label].detach().to('cpu').numpy().squeeze(), cmap = colour)
             axs[1,j].axis("off")
@@ -71,7 +73,7 @@ class reconstruct():
 
     def vae128(self, galaxies, colour = 'hot', num_images = 10, title = False, img_title = 'Reconstruction Vae'):
         # Input of cvae and cvae 2 is galaxies + redshifts
-        galaxies_pred = self.Vae(galaxies.to(self.device))
+        galaxies_pred = self.Vae(galaxies.unsqueeze(1).to(self.device))
 
         figure, axs = plt.subplots(2, num_images, figsize = (num_images, 2))
         
@@ -153,8 +155,8 @@ class generate():
         figure, axs = plt.subplots(rows, cols, figsize = (cols, rows))
         for i in range(rows):
             for j in range(cols):
-                z_generated = torch.normal(0, 1, size = (1, self.z_dim)).to(self.device)
-                pred_galaxies, pred_redshift = self.Vae.decoder(self.Vae.concatenate(z_generated, redshift))
+                z_generated = torch.normal(0, 1, size = (1, 1, self.z_dim)).to(self.device)
+                pred_galaxies, pred_redshift = self.Vae.decoder(self.Vae.encoder.concatenate2(z_generated, redshift))
                 
                 axs[i,j].imshow(pred_galaxies.detach().to('cpu').squeeze().numpy(), cmap = colour)
                 axs[i,j].axis('off')
@@ -230,11 +232,11 @@ class interpolate():
     def fancy_cvae(self, redshift_tensor, cols = 8, colour = 'hot', title = False, figure_title = "Interpolation fancy cvae architecture"):
         
         figure, axs = plt.subplots(1, cols, figsize = (cols, 1))
-        z_generated = torch.normal(0, 1, size = (1, self.z_dim)).to(self.device)
+        z_generated = torch.normal(0, 1, size = (1, 1, self.z_dim)).to(self.device)
 
         for j in range(cols):
             redshift = torch.tensor([redshift_tensor[j]]).to(self.device)
-            pred_galaxies, pred_redshift = self.Vae.decoder(self.Vae.concatenate(z_generated, redshift))
+            pred_galaxies, pred_redshift = self.Vae.decoder(self.Vae.encoder.concatenate2(z_generated, redshift))
             
             axs[j].imshow(pred_galaxies.detach().to('cpu').squeeze().numpy(), cmap = colour)
             axs[j].axis('off')
