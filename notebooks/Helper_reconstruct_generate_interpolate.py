@@ -21,7 +21,7 @@ class reconstruct():
             rdm_label = torch.randint(self.batchsize, size =(1,))
             axs[0,j].imshow(galaxies[rdm_label].squeeze(), cmap = colour)
             axs[0,j].axis("off")
-            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 7)
+            axs[0,j].annotate(f"{zphot[rdm_label].item():.2f}", xycoords = "axes fraction", xy = (0.7, 0.85), color = 'white', fontsize = 6)
             axs[1,j].imshow(galaxies_pred[rdm_label].detach().to('cpu').numpy().squeeze(), cmap = colour)
             axs[1,j].axis("off")
         
