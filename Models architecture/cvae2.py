@@ -3,15 +3,16 @@ from torch import nn, optim
 import numpy as np
 from tqdm.auto import trange
 
-class VariationalEncoder(nn.Module):
+class Encoder(nn.Module):
     """
     Encodes a tensor (N, C, 158, 158) representing a batch of 158*158 images 
     into a latent tensor z of shape (N, C, z_dim)  
     """
-    def __init__(self, nc, nf, z_dim):
-        super(VariationalEncoder, self).__init__()
-        self.nf = nf
-        self.z_dim = z_dim
+    def __init__(self, z_dim):
+        super(Encoder, self).__init__()
+        nc = 1
+        nf = 64 # (just like in the pytorch implementation of the DCGAN)
+
         self.layers = nn.Sequential(
             # 158*158 1 channel to 79*79 64 channels
             nn.Conv2d(nc, nf, 4, 2, 1, bias = False),
@@ -55,7 +56,7 @@ class VariationalEncoder(nn.Module):
 
     
     def forward(self, x, condition):
-        # Sending input (N,1,158,158) into the model; N = batch size
+        # Sending input (N,158,158) into the model; N = batch size
         x = x.unsqueeze(1)
         condition = condition.unsqueeze(1)
         x = self.layers(x)
@@ -81,9 +82,10 @@ class Decoder(nn.Module):
     Decode a latent tensor z of shape (N, z_dim) 
     into a batch of 158*158 galaxy images (N, C, 158, 158)  
     """
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(Decoder, self).__init__()
-        self.nc = nc
+        nc = 1
+        nf = 64
         self.layers = nn.Sequential(
             # 5*5 1 channel to 10*10 512 channels
             nn.ConvTranspose2d(nc, nf*8, 4, 2, 1),
@@ -115,7 +117,7 @@ class Decoder(nn.Module):
     def forward(self, z):
         # z shape =  (N, z_dim + 1)
         z = self.linear1(z) # (N, 25)
-        z = z.reshape((-1, self.nc, 5, 5))
+        z = z.reshape((-1, 1, 5, 5))
         return self.layers(z).squeeze()
         
 class VariationalAutoencoder(nn.Module):
@@ -128,10 +130,10 @@ class VariationalAutoencoder(nn.Module):
     Input > x = (N, 158, 158), batch of galaxy images; condition = (N,), batch of the redshifts associated to the galaxy images  
     Output > x_pred = (N, 158, 158) 
     """
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(VariationalAutoencoder, self).__init__()
-        self.encoder = VariationalEncoder(nc, nf, z_dim)
-        self.decoder = Decoder(nc, nf, z_dim)
+        self.encoder = Encoder(z_dim)
+        self.decoder = Decoder(z_dim)
 
     def forward(self, x, condition):
         z = self.encoder(x, condition)
@@ -147,40 +149,9 @@ class VariationalAutoencoder(nn.Module):
         mse = []
         kl = []
         
-        with trange(epochs) as pbar:
-            for epoch in pbar:
-                if epoch == 40:
-                    optimizer = optim.Adam(self.parameters(), lr = 1e-3*learning_rate)
-                for x, condition in train_loader:
-                    x, condition = x.to(device), condition.to(device)
-                    x_pred = self.forward(x, condition)
-                    loss = loss_fn(x_pred, x) + beta*self.encoder.kl
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    train_loss.append(loss.item())
-                    mse.append(loss_fn(x_pred, x).item())
-                    kl.append(self.encoder.kl.item())
-                    pbar.set_description(f"Train loss: {loss.item():.2g}")
-
-                with torch.no_grad():
-                    for x, condition in val_loader:
-                        x, condition = x.to(device), condition.to(device)
-                        x_pred = self.forward(x, condition)
-                        loss = loss_fn(x_pred, x) + beta*self.encoder.kl
-                        val_loss.append(loss.item())
-
-        return np.array(train_loss), np.array(val_loss), np.array(mse), np.array(kl)
-
-    def traintab(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
-        device = 'cuda' 
-        
-        optimizer = optim.Adam(self.parameters(), lr = learning_rate) 
-        loss_fn = nn.MSELoss(reduction = 'sum')
-        train_loss = []
-        val_loss = []
-        mse = []
-        kl = []
+        # Making sure beta is a table of values 
+        if type(beta) == float or type(beta) == int:
+            beta = beta * torch.ones(epochs)
         
         with trange(epochs) as pbar:
             for epoch in pbar:

@@ -3,10 +3,11 @@ from torch import nn, optim
 import numpy as np
 from tqdm.auto import trange 
 
-class VariationalEncoder(nn.Module):
-    def __init__(self, nc, nf, z_dim):
-        super(VariationalEncoder, self).__init__()
-        
+class Encoder(nn.Module):
+    def __init__(self, z_dim):
+        super(Encoder, self).__init__()
+        nc = 1
+        nf = 64
         self.layers = nn.Sequential(
             # 128*128 images 1 channel to 64*64 images with 64 channels 
             nn.Conv2d(nc, nf, 4, 2, 1, bias = False),
@@ -63,8 +64,11 @@ class VariationalEncoder(nn.Module):
         return z
 
 class Decoder(nn.Module):
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(Decoder, self).__init__()
+        nc = 1
+        nf = 64
+
         self.layers = nn.Sequential(
             # 4*4 images 1 channel to 8*8images 512 (8*64) channels 
             nn.ConvTranspose2d(nc, nf*8, 5,1,0, bias = False),
@@ -88,7 +92,7 @@ class Decoder(nn.Module):
             
             # 64*64 images 64 channels to 128*128 images 1 channel
             nn.ConvTranspose2d(nf, nc, 4, 2, 1, bias=False),
-            nn.Sigmoid()
+            nn.Sigmoid() # to have pixels between 0 and 1
         )
         self.linear1 = nn.Linear(z_dim, nf//4)
         
@@ -108,10 +112,10 @@ class VariationalAutoencoder(nn.Module):
     - nf = size of the feature map
     - z_dim = size of the latent space 
     """
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(VariationalAutoencoder, self).__init__()
-        self.encoder = VariationalEncoder(nc, nf, z_dim)
-        self.decoder = Decoder(nc, nf, z_dim)
+        self.encoder = Encoder(z_dim)
+        self.decoder = Decoder(z_dim)
     
     def forward(self, x):
         z = self.encoder(x)
@@ -120,7 +124,10 @@ class VariationalAutoencoder(nn.Module):
     def train_time(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
         device = 'cuda' 
         
-        # No tracking of the iotimizer during training maybe ? 
+        # Making sure beta is a table of values 
+        if type(beta) == float or type(beta) == int:
+            beta = beta * torch.ones(epochs)
+        
         optimizer = optim.Adam(self.parameters(), lr = learning_rate) 
         loss_fn = nn.MSELoss(reduction = 'sum')
         train_loss = []
@@ -130,41 +137,6 @@ class VariationalAutoencoder(nn.Module):
         
         with trange(epochs) as pbar:
             for epoch in pbar:
-                for x in train_loader:
-                    x = x.unsqueeze(1).to(device) # (N, 1, 158, 158) on gpu
-                    x_pred = self.forward(x)
-                    loss = loss_fn(x_pred, x) + beta*self.encoder.kl
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    train_loss.append(loss.item())
-                    mse.append(loss_fn(x_pred, x).item())
-                    kl.append(self.encoder.kl.item())
-                    pbar.set_description(f"Train loss: {loss.item():.2g}")
-        
-                with torch.no_grad():
-                    for x in val_loader:
-                        x = x.unsqueeze(1).to(device) # (N, 1, 158, 158) on gpu
-                        x_pred = self.forward(x)
-                        loss = loss_fn(x_pred, x) + beta*self.encoder.kl
-                        val_loss.append(loss.item())
-
-        return np.array(train_loss), np.array(val_loss), np.array(mse), np.array(kl)
-
-    
-    def traintab(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
-        device = 'cuda' 
-        
-        # No tracking of the loss nor optimizer during training maybe ? 
-        optimizer = optim.Adam(self.parameters(), lr = learning_rate) 
-        loss_fn = nn.MSELoss(reduction = 'sum')
-        train_loss = []
-        val_loss = []
-        mse = []
-        kl = []
-        
-        with trange(epochs) as pbar:
-            for epoch in pbar:    
                 for x in train_loader:
                     x = x.unsqueeze(1).to(device) # (N, 1, 158, 158) on gpu
                     x_pred = self.forward(x)
@@ -181,7 +153,7 @@ class VariationalAutoencoder(nn.Module):
                     for x in val_loader:
                         x = x.unsqueeze(1).to(device) # (N, 1, 158, 158) on gpu
                         x_pred = self.forward(x)
-                        loss = loss_fn(x_pred, x) + beta*self.encoder.kl
+                        loss = loss_fn(x_pred, x) + beta[epoch]*self.encoder.kl
                         val_loss.append(loss.item())
 
         return np.array(train_loss), np.array(val_loss), np.array(mse), np.array(kl)

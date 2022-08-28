@@ -3,14 +3,15 @@ from torch import nn, optim
 import numpy as np
 from tqdm.auto import trange
 
-class VariationalEncoder(nn.Module):
+class Encoder(nn.Module):
     """
     Encodes a tensor (N, C, 158, 158) representing a batch of 158*158 images 
     into a latent tensor z of shape (N, C, z_dim)  
     """
-    def __init__(self, nc, nf, z_dim):
-        super(VariationalEncoder, self).__init__()
-
+    def __init__(self, z_dim):
+        super(Encoder, self).__init__()
+        nc = 2
+        nf = 64
         self.layers = nn.Sequential(
             # 158*158 1 channel to 79*79 64 channels
             nn.Conv2d(nc, nf, 4, 2, 1, bias = False),
@@ -54,14 +55,18 @@ class VariationalEncoder(nn.Module):
 
 
     def concatenate1(self, x, condition):
-        x = x.unsqueeze(1)
-        condition_img = condition[:, None, None, None] * torch.ones_like(x)
-        x_cond = torch.cat((x, condition_img), dim = 1)
+        """
+        Concatenate a tensor x of shape (N, k) and a condition tensor (N,) along the channel dimension
+        Returns the concatenated tensor x_cond = (N, 2, k)  
+        """
+        x = x.unsqueeze(1) # (N, k) to (N, 1, k)
+        condition_img = condition[:, None, None, None] * torch.ones_like(x) 
+        x_cond = torch.cat((x, condition_img), dim = 1) 
         return x_cond
 
     def concatenate2(self, x, condition):
         """
-        Concatenate a tensor x of shape (N, k) and a condition tensor (N,) along the channel dimension
+        Concatenate a tensor x of shape (N, 1, k) and a condition tensor (N,) along the channel dimension
         Returns the concatenated tensor x_cond = (N, 2, k)  
         """
         condition_img = condition[:, None, None]*torch.ones_like(x)
@@ -81,8 +86,9 @@ class VariationalEncoder(nn.Module):
         logVar = self.linear2(x_cond)
         self.std = torch.exp(logVar/2)
         
+        # Reparameterization trick 
         z = self.reparameterize(self.mu, self.std) # (N, 1, z_dim)
-        z_cond = self.concatenate2(z, condition)
+        z_cond = self.concatenate2(z, condition) # (N, 2, z_dim)
 
         # Updating the kl term value
         self.kl = 1/2*(self.mu**2 + torch.exp(logVar) -logVar -1).sum()
@@ -96,9 +102,10 @@ class Decoder(nn.Module):
     Decode a latent tensor z of shape (N, C, z_dim) 
     into a batch of 158*158 galaxy images (N, C, 158, 158)  
     """
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(Decoder, self).__init__()
-        self.nc = nc
+        nc = 2
+        nf = 64
         self.layers = nn.Sequential(
             # 5*5 2 channels to 10*10 512 channels
             nn.ConvTranspose2d(nc, nf*8, 4, 2, 1),
@@ -128,7 +135,7 @@ class Decoder(nn.Module):
 
     def forward(self, z_cond):
 
-        z_cond = self.linear1(z_cond).reshape((-1, self.nc, 5, 5))
+        z_cond = self.linear1(z_cond).reshape((-1, 2, 5, 5))
         x_pred = self.layers(z_cond)
         return x_pred.squeeze()
 
@@ -144,10 +151,10 @@ class VariationalAutoencoder(nn.Module):
 
     Reconstruct a image-based input
     """
-    def __init__(self, nc, nf, z_dim):
+    def __init__(self, z_dim):
         super(VariationalAutoencoder, self).__init__()
-        self.encoder = VariationalEncoder(nc, nf, z_dim)
-        self.decoder = Decoder(nc, nf, z_dim)
+        self.encoder = Encoder(z_dim)
+        self.decoder = Decoder(z_dim)
 
     def forward(self, x, condition):
         z_cond = self.encoder(x, condition)
@@ -163,21 +170,24 @@ class VariationalAutoencoder(nn.Module):
     def train_time(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
         device = 'cuda' 
         
-        # No tracking of the iotimizer during training maybe ? 
         optimizer = optim.Adam(self.parameters(), lr = learning_rate) 
         loss_fn = nn.MSELoss(reduction = 'sum')
         train_loss = []
         val_loss = []
         mse = []
         kl = []
+
+        # Making sure beta is a table of values 
+        if type(beta) == float or type(beta) == int:
+            beta = beta * torch.ones(epochs)
         
-        with trange(epochs) as pbar:
+        with trange(epochs) as pbar: # progress bar 
             for epoch in pbar:
                 for x, condition in train_loader:
                     x = x.to(device) # (N, 158, 158) on gpu
                     condition = condition.to(device)
                     x_pred = self.forward(x, condition)
-                    loss = loss_fn(x_pred, x) + beta*self.encoder.kl
+                    loss = loss_fn(x_pred, x) + beta[epoch]*self.encoder.kl
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -191,39 +201,6 @@ class VariationalAutoencoder(nn.Module):
                     for x, condition in val_loader:
                         x = x.to(device)
                         condition = condition.to(device)
-                        x_pred = self.forward(x, condition)
-                        loss = loss_fn(x_pred, x) + beta*self.encoder.kl
-                        val_loss.append(loss.item())
-
-        return np.array(train_loss), np.array(val_loss), np.array(mse), np.array(kl)
-
-def traintab(self, train_loader, val_loader, epochs = 100, learning_rate = 1e-3, beta = 0.1):
-        device = 'cuda' 
-        
-        optimizer = optim.Adam(self.parameters(), lr = learning_rate) 
-        loss_fn = nn.MSELoss(reduction = 'sum')
-        train_loss = []
-        val_loss = []
-        mse = []
-        kl = []
-        
-        with trange(epochs) as pbar:
-            for epoch in pbar:
-                for x, condition in train_loader:
-                    x, condition = x.to(device), condition.to(device)
-                    x_pred = self.forward(x, condition)
-                    loss = loss_fn(x_pred, x) + beta[epoch]*self.encoder.kl
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    train_loss.append(loss.item())
-                    mse.append(loss_fn(x_pred, x).item())
-                    kl.append(self.encoder.kl.item())
-                    pbar.set_description(f"Train loss: {loss.item():.2g}")
-
-                with torch.no_grad():
-                    for x, condition in val_loader:
-                        x, condition = x.to(device), condition.to(device)
                         x_pred = self.forward(x, condition)
                         loss = loss_fn(x_pred, x) + beta[epoch]*self.encoder.kl
                         val_loss.append(loss.item())

@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import torch
-from zmq import device
 
-
+# Lots of code for doing pretty much the same thing (optimization needed)
 
 ##################################################### Reconstruction #############################################################################
 

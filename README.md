@@ -25,7 +25,7 @@ Then, three Cvae models (for the second dataset):
 
 ![Fancy cvae](https://github.com/EnceladeCandy/vae-project/blob/main/fancy_cvae.png)
 
-The performance of these architectures is really similar. The unique noteworthy difference is the training time which is shorter by 20 sec/epoch for `cvae2` compared to the others. 
+The performance of these architectures is really similar. The unique noteworthy difference is the training time which is shorter by 20 sec/epoch for `cvae2` compared to the others, so I'd recommend using the `cvae2` architecture for conditionned generation of galaxy images. 
 
 
 # Notebooks
@@ -34,6 +34,9 @@ In the folder `notebooks`, you will find all the code related to each model's tr
 - Image reconstruction 
 - Image generation
 - Latent space visualization 
+
+# References 
+
 
 
 
