@@ -40,7 +40,7 @@ In the folder `notebooks`, you will find all the code related to each model's tr
 - Image generation
 - Latent space visualization 
 
-# What's next ? 
+# How to improve the current model? 
 ## Normalizing flows
  Currently, we are generating images by giving some random samples of a Gaussian $\mathcal{N}(0,I)$ to the decoder. Since we are working with a disentangled conditional vae, we don't really know if these samples give us a good representation of our latent space. In fact, they are very unlikely to give us a good representation when $\beta$ is close to 0. We can visualize the latent space with 2d histograms to see if it's the case but it would be great to have a method to be sure we sample directly from the latent space. That's why the next step would be to implement a Normalizing flow to learn an invertible transformation from the rather "complex" probability distribution learnt by the vae to a simple Normal distribution. This would help the decoder during the generative process.
 
@@ -48,7 +48,7 @@ In the folder `notebooks`, you will find all the code related to each model's tr
 Training our model on a bigger dataset (314 000 galaxy images instead of 81 500).
 
 ## Fine-tuning of the model
-We could maybe improve the results with some fine-tuning of the hyperparameters of the model or with different machine learning approaches that are not implemented yet (i.e. learning rate decay). 
+We could maybe improve the results with some fine-tuning of the hyperparameters of the model or with different machine learning approaches that are not implemented yet (e.g. learning rate decay). 
 
 
 
